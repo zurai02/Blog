@@ -1,5 +1,5 @@
 /* ============================================
-   zurai02 blog — site.js
+   zurai02 blog — site.js (FIXED VERSION)
    Particles, typewriter, posts, admin, markdown
    ============================================ */
 
@@ -151,15 +151,18 @@ function setGreeting() {
 
 // ─── POSTS DATA ──────────────────────────────
 let postsData = [];
+let adminCreds = { email: '', password: '' };
 
 async function loadPosts() {
   try {
     const res = await fetch('posts.json');
     postsData = await res.json();
+    if (!Array.isArray(postsData)) postsData = [];
     postsData.sort((a, b) => new Date(b.date) - new Date(a.date));
     return postsData;
   } catch (e) {
     console.error('Failed to load posts:', e);
+    postsData = [];
     return [];
   }
 }
@@ -192,6 +195,11 @@ async function renderPosts() {
 
   if (count) count.textContent = `${posts.length} total`;
 
+  if (posts.length === 0) {
+    grid.innerHTML = '<p class="no-posts">No posts yet.</p>';
+    return;
+  }
+
   grid.innerHTML = posts.map(renderPostCard).join('');
 
   // Scroll reveal
@@ -208,9 +216,15 @@ async function renderPosts() {
 
 // ─── SINGLE POST ─────────────────────────────
 async function loadPost(postId) {
+  if (!postId) { location.href = '/'; return; }
+  
   const posts = await loadPosts();
   const post = posts.find(p => p.id === postId);
-  if (!post) { location.href = '/'; return; }
+  if (!post) { 
+    console.error('Post not found:', postId);
+    location.href = '/'; 
+    return; 
+  }
 
   document.getElementById('page-title').textContent = `zurai02 — ${post.title}`;
   document.getElementById('post-title').textContent = post.title;
@@ -220,44 +234,94 @@ async function loadPost(postId) {
   document.getElementById('post-content').innerHTML = markdownToHtml(post.content);
 }
 
-// ─── MARKDOWN PARSER ─────────────────────────
+// ─── MARKDOWN PARSER (FIXED) ─────────────────
 function markdownToHtml(md) {
+  // Escape HTML first
   let html = md
-    // Escape HTML
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    // Code blocks
-    .replace(/```(lz|luau)?\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // Headers
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Blockquote
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    // Lists
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    // Paragraphs
-    .split('\n\n').map(p => {
-      p = p.trim();
-      if (!p) return '';
-      if (p.startsWith('<h') || p.startsWith('<pre') || p.startsWith('<blockquote') || p.startsWith('<li')) {
-        // Wrap consecutive li in ul
-        if (p.startsWith('<li>')) {
-          return '<ul>' + p + '</ul>';
-        }
-        return p;
-      }
-      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
-    }).join('\n')
-    // Fix consecutive lists
-    .replace(/<\/ul>\s*<ul>/g, '');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
-  return html;
+  // Code blocks (must be before inline code)
+  html = html.replace(/```(lz|luau)?\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // Headers
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  
+  // Bold and italic
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  
+  // Blockquote
+  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+  
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // Process paragraphs and lists line by line
+  const lines = html.split('\n');
+  let result = [];
+  let inList = false;
+  let listType = null; // 'ul' or 'ol'
+  let listBuffer = [];
+
+  function flushList() {
+    if (listBuffer.length > 0) {
+      result.push(`<${listType}>${listBuffer.join('')}</${listType}>`);
+      listBuffer = [];
+      inList = false;
+      listType = null;
+    }
+  }
+
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) {
+      flushList();
+      continue;
+    }
+
+    // Skip if it's a block-level element already
+    if (line.startsWith('<h') || line.startsWith('<pre') || line.startsWith('<blockquote')) {
+      flushList();
+      result.push(line);
+      continue;
+    }
+
+    // Unordered list
+    const ulMatch = line.match(/^- (.+)$/);
+    // Ordered list  
+    const olMatch = line.match(/^\d+\. (.+)$/);
+
+    if (ulMatch) {
+      if (!inList || listType !== 'ul') {
+        flushList();
+        inList = true;
+        listType = 'ul';
+      }
+      listBuffer.push(`<li>${ulMatch[1]}</li>`);
+    } else if (olMatch) {
+      if (!inList || listType !== 'ol') {
+        flushList();
+        inList = true;
+        listType = 'ol';
+      }
+      listBuffer.push(`<li>${olMatch[1]}</li>`);
+    } else {
+      flushList();
+      // Regular paragraph
+      result.push(`<p>${line}</p>`);
+    }
+  }
+  
+  flushList();
+  return result.join('\n');
 }
 
 function escapeHtml(text) {
@@ -266,30 +330,38 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ─── ADMIN ───────────────────────────────────
-// NOTE: In production, these checks MUST happen server-side.
-// This client-side check is for demo/static hosting only.
-// The .env file is NOT accessible from the browser.
-
-const ADMIN_CREDS = {
-  // These are placeholders. In a real setup, a backend reads .env
-  // For static hosting, you'd use a serverless function or similar.
-  email: 'admin@zurai02.dev',
-  password: 'changeme123'
-};
+// ─── ADMIN AUTH (FIXED) ──────────────────────
+// Load credentials from config.json instead of fake .env
+async function loadAdminConfig() {
+  try {
+    const res = await fetch('admin-config.json');
+    if (res.ok) {
+      const config = await res.json();
+      adminCreds = config;
+    }
+  } catch (e) {
+    console.log('No admin-config.json found, using defaults');
+    // Fallback - change these!
+    adminCreds = {
+      email: 'admin@zurai02.dev',
+      password: 'changeme123'
+    };
+  }
+}
 
 async function attemptLogin() {
+  // Ensure config is loaded
+  if (!adminCreds.email) await loadAdminConfig();
+  
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   const errorEl = document.getElementById('login-error');
 
-  // Try to load real creds from a server endpoint if available
-  // Fallback to hardcoded for static demo
-  if (email === ADMIN_CREDS.email && password === ADMIN_CREDS.password) {
+  if (email === adminCreds.email && password === adminCreds.password) {
     localStorage.setItem('zurai_admin', 'true');
     document.getElementById('admin-login').style.display = 'none';
     document.getElementById('admin-dashboard').style.display = 'block';
-    renderAdminPosts();
+    await renderAdminPosts();
   } else {
     errorEl.textContent = 'invalid credentials';
     setTimeout(() => errorEl.textContent = '', 3000);
@@ -300,6 +372,11 @@ async function renderAdminPosts() {
   const posts = await loadPosts();
   const list = document.getElementById('admin-posts-list');
   if (!list) return;
+
+  if (posts.length === 0) {
+    list.innerHTML = '<p class="no-posts">No posts yet. Create your first one!</p>';
+    return;
+  }
 
   list.innerHTML = posts.map(post => `
     <div class="admin-post-item">
@@ -321,13 +398,15 @@ function showEditor(id = null) {
   editingId = id;
   const overlay = document.getElementById('editor-overlay');
   const label = document.getElementById('editor-title-label');
+  const idField = document.getElementById('edit-id');
   overlay.style.display = 'flex';
 
   if (id) {
     label.textContent = 'edit post';
+    idField.style.display = 'none'; // Hide ID when editing (can't change it)
     const post = postsData.find(p => p.id === id);
     if (post) {
-      document.getElementById('edit-id').value = post.id;
+      idField.value = post.id;
       document.getElementById('edit-title').value = post.title;
       document.getElementById('edit-date').value = post.date;
       document.getElementById('edit-tags').value = post.tags.join(', ');
@@ -335,7 +414,8 @@ function showEditor(id = null) {
     }
   } else {
     label.textContent = 'new post';
-    document.getElementById('edit-id').value = '';
+    idField.style.display = 'block'; // Show ID field for new posts
+    idField.value = '';
     document.getElementById('edit-title').value = '';
     document.getElementById('edit-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('edit-tags').value = '';
@@ -349,19 +429,33 @@ function closeEditor() {
 }
 
 function savePost() {
-  const id = editingId || document.getElementById('edit-id').value.trim();
+  const id = editingId || document.getElementById('edit-id').value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const title = document.getElementById('edit-title').value.trim();
   const date = document.getElementById('edit-date').value;
   const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
   const content = document.getElementById('edit-content').value;
 
-  if (!id || !title || !content) {
-    alert('id, title, and content are required');
+  if (!id) {
+    alert('Post ID is required (used in the URL)');
+    return;
+  }
+  if (!title) {
+    alert('Title is required');
+    return;
+  }
+  if (!content) {
+    alert('Content is required');
+    return;
+  }
+
+  // Check for duplicate ID when creating new post
+  if (!editingId && postsData.some(p => p.id === id)) {
+    alert(`A post with ID "${id}" already exists. Use a different ID.`);
     return;
   }
 
   const existingIndex = postsData.findIndex(p => p.id === id);
-  const newPost = { id, title, date, tags, content };
+  const newPost = { id, title, date: date || new Date().toISOString().split('T')[0], tags, content };
 
   if (existingIndex >= 0) {
     postsData[existingIndex] = newPost;
@@ -369,8 +463,10 @@ function savePost() {
     postsData.push(newPost);
   }
 
-  // In a real app, you'd POST this to a server to update posts.json
-  // For static hosting, download the updated JSON:
+  // Sort by date
+  postsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Download updated JSON
   const blob = new Blob([JSON.stringify(postsData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -381,7 +477,7 @@ function savePost() {
 
   closeEditor();
   renderAdminPosts();
-  alert('posts.json downloaded. Replace the old one to update your blog.');
+  alert('posts.json downloaded. Replace the old one and redeploy to update your blog.');
 }
 
 function editPost(id) {
@@ -389,7 +485,7 @@ function editPost(id) {
 }
 
 function deletePost(id) {
-  if (!confirm('delete this post?')) return;
+  if (!confirm('Delete this post? This cannot be undone.')) return;
   postsData = postsData.filter(p => p.id !== id);
 
   const blob = new Blob([JSON.stringify(postsData, null, 2)], { type: 'application/json' });
@@ -421,11 +517,22 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPosts();
   }
 
-  // Admin enter key
-  const loginPw = document.getElementById('login-password');
-  if (loginPw) {
-    loginPw.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') attemptLogin();
+  // Admin: load config and check login state
+  if (document.getElementById('admin-login')) {
+    loadAdminConfig().then(() => {
+      if (localStorage.getItem('zurai_admin') === 'true') {
+        document.getElementById('admin-login').style.display = 'none';
+        document.getElementById('admin-dashboard').style.display = 'block';
+        renderAdminPosts();
+      }
     });
+    
+    // Admin enter key
+    const loginPw = document.getElementById('login-password');
+    if (loginPw) {
+      loginPw.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') attemptLogin();
+      });
+    }
   }
 });
