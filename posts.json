@@ -3,21 +3,44 @@
     "id": "welcome",
     "title": "Welcome to my blog",
     "date": "2026-08-28",
-    "tags": ["meta", "intro"],
+    "tags": [
+      "meta",
+      "intro"
+    ],
     "content": "This is the first post on my new blog. Built with the same aesthetic as my portfolio site — dark, minimal, and fast.\n\nI'll be writing about Roblox scripting, Luau optimization, systems programming with Luazi, and whatever else catches my interest.\n\nStay tuned."
   },
   {
     "id": "luazi-why-i-built-it",
     "title": "Why I Built Luazi",
     "date": "2026-08-25",
-    "tags": ["luazi", "systems", "compiler"],
+    "tags": [
+      "luazi",
+      "systems",
+      "compiler"
+    ],
     "content": "Luazi started as a frustration with existing scripting languages on Roblox. I wanted something with:\n\n- Type safety without the bloat\n- Memory safety that doesn't kill performance\n- Multi-target compilation (WASM, C++, C#)\n- A syntax that feels like Lua but with modern features\n\nThe result is a Hindley-Milner type system, ownership/borrowing inspired by Rust, and a bytecode VM that can target multiple runtimes.\n\n```lz\nfn fib(n: number) -> number {\n    guard n >= 0 else { return 0 }\n    match n {\n        0 => 0,\n        1 => 1,\n        _ => fib(n - 1) + fib(n - 2)\n    }\n}\n```\n\nMore on the compiler architecture soon."
   },
   {
     "id": "roblox-optimization-tips",
     "title": "Roblox Optimization Tips That Actually Work",
     "date": "2026-08-20",
-    "tags": ["roblox", "luau", "performance"],
+    "tags": [
+      "roblox",
+      "luau",
+      "performance"
+    ],
     "content": "Here are optimization techniques I use on every project, pulled from both production experience and community research:\n\n**1. Object Pooling**\nDon't Destroy() and Instance.new() in loops. Pool your parts, UI elements, and sounds. The GC pressure alone will tank your frame rate.\n\n```luau\nlocal pool = ObjectPool.new(\"Part\", 100)\nlocal part = pool:Acquire()\n-- use part\npool:Release(part)\n```\n\n**2. Batch RemoteEvents**\nInstead of firing 50 individual remotes per frame, batch them into a single table send. Network replication is expensive — treat it like a scarce resource.\n\n**3. Avoid TweenService for complex sequences**\nTweenService creates a new tween object every call and doesn't give you fine-grained control. A custom interpolation module with RunService.Heartbeat gives you cancellation, chaining, and zero-allocation updates.\n\n**4. Collision Fidelity**\nFor objects the player can't walk on, set CollisionFidelity to Box. For complex shapes with many triangles, use Hull instead of PreciseConvexDecomposition.\n\n**5. Mesh RenderFidelity**\nSet mesh RenderFidelity to Performance for anything that isn't a hero asset. The visual difference is usually negligible, but the render cost drop is significant.\n\n**6. Avoid Transparent and Unanchored Parts**\nSemi-transparent parts and unanchored physics sims are frame-rate killers. Anchor everything that doesn't need physics, and keep transparency to a minimum.\n\n**7. Instancing and Meshes for Repeats**\nChairs, trees, streetlights — if you repeat it, make it a Mesh or Union. The engine instanciates these far cheaper than unique Part assemblies.\n\n**8. StreamingEnabled**\nTurn it on. If your scripts break because of WaitForChild timing, fix the scripts. Streaming is one of the highest-impact optimizations you can enable.\n\n**9. CastShadow on Micro-Details**\nGrass blades, pebbles, tiny interior props — turn CastShadow off. Shadow calculation on irrelevant geometry is pure waste.\n\n**10. Disable CanTouch and CanQuery**\nBackground scenery, walls, map borders — if it doesn't need hit detection, turn both off. Stops the physics engine from burning CPU on useless collision checks.\n\n**11. Luau Compiler Directives**\nUse `--!strict` for type safety, `--!optimize 2` for published games, and `--!native` for math-heavy hot paths. Native compilation translates Luau to machine-readable C++ at runtime — unbeatable speed, but higher memory footprint.\n\n**12. Texture Discipline**\nKeep textures small, reuse them aggressively, avoid semi-transparent textures, and minimize how many are active at once. Fewer active textures = less memory pressure and faster draw calls.\n\n**13. Skip Custom Culling**\nRoblox's engine-level C++ culling is faster than anything you can write in Luau. Don't fight the engine — let it handle visibility.\n\n**14. Profile Before You Optimize**\nUse the MicroProfiler to diagnose actual lag spikes. Don't guess. Measure, find the bottleneck, then fix it."
+  },
+  {
+    "id": "github-learning-lecture",
+    "title": "GitHub Learning Lecture",
+    "date": "2026-08-29",
+    "tags": [
+      "github",
+      "git",
+      "learning",
+      "tutorial"
+    ],
+    "content": "A curated guide to learning Git and GitHub, from first commit to confident collaboration.\n\n## Why GitHub?\n\nVersion control isn't optional once you're building anything bigger than a single script. GitHub is the industry standard for hosting, collaborating, and shipping code. Whether you're working on Roblox games, systems tools like Luazi, or open-source contributions, GitHub is the backbone.\n\n## Core Concepts\n\n- **Repository (repo):** A project's folder tracked by Git. Contains all files and full history.\n- **Commit:** A snapshot of changes with a message describing what changed and why.\n- **Branch:** An independent line of development. `main` (or `master`) is the default.\n- **Pull Request (PR):** A proposal to merge changes from one branch into another. This is where code review happens.\n- **Clone, Fork, Merge:** Clone copies a repo locally. Fork creates your own copy on GitHub. Merge brings branches together.\n\n## Essential Commands\n\n```bash\n# Setup\ngit config --global user.name \"Your Name\"\ngit config --global user.email \"you@example.com\"\n\n# Daily workflow\ngit init                          # Start a new repo\ngit clone <url>                   # Copy a repo locally\ngit add <file>                    # Stage changes\ngit commit -m \"message\"           # Save a snapshot\ngit push origin main              # Upload to GitHub\ngit pull origin main              # Download latest changes\ngit branch feature-x              # Create a branch\ngit switch feature-x              # Move to that branch\ngit merge feature-x               # Merge branch into current\n```\n\n## Recommended Learning Path\n\n**Phase 1 — Hello World (1–2 hours)**\n- Walk through [GitHub's Hello World tutorial](https://docs.github.com/en/get-started/using-github/hello-world)\n- Complete [GitHub Skills: Introduction to GitHub](https://skills.github.com/)\n\n**Phase 2 — Branching & Merging (2–3 hours)**\n- Practice with [Learn Git Branching](https://learngitbranching.js.org/)\n- Create branches, open pull requests, and resolve merge conflicts in a test repo\n\n**Phase 3 — Real Collaboration**\n- Fork an open-source repo and submit a PR fixing a `good first issue`\n- Set up [GitHub Pages](https://pages.github.com/) to host a personal site or project docs\n\n**Phase 4 — Advanced Workflows**\n- Learn [GitHub Actions](https://github.com/features/actions) for CI/CD\n- Explore rebasing, cherry-picking, and stashing with [Pro Git](https://git-scm.com/book)\n\n## Best Resources\n\n| Resource | Type | Best For |\n|----------|------|----------|\n| [GitHub Skills](https://skills.github.com/) | Interactive courses | Hands-on practice in real repos |\n| [Learn Git Branching](https://learngitbranching.js.org/) | Visual game | Understanding branching visually |\n| [Inter-Git](https://inter-git.com) | Browser tutorial | Running real commands with feedback |\n| [GitHub Docs](https://docs.github.com/) | Official docs | Reference and deep dives |\n| [Pro Git](https://git-scm.com/book) | Free book | Understanding Git internals |\n| [freeCodeCamp Crash Course](https://www.youtube.com/watch?v=RGOj5yH8evw) | Video | ~1 hour guided walkthrough |\n\n## Pro Tips\n\n- **Commit often, push regularly.** Small, focused commits are easier to review and revert.\n- **Write meaningful commit messages.** \"Fix collision bug in player controller\" beats \"fix stuff.\"\n- **Use `.gitignore`.** Never commit build artifacts, secrets, or large binary files.\n- **Read PRs before merging.** Even on solo projects, self-review catches bugs.\n- **Don't fear the command line.** GUIs are fine, but knowing the CLI makes you unstuck when things break.\n\n> *\"The core commands you'll use daily are just a handful — `add`, `commit`, `push`, `pull`, `branch`, and `switch`. You don't need to memorize everything upfront.\"*\n\nStart small. Make a repo, break something, fix it, and push. That's how you learn."
   }
 ]
