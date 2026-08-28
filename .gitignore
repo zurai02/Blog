@@ -1,0 +1,53 @@
+# ============================================
+# Blog - zurai02.github.io (Jekyll)
+# ============================================
+
+# --- SECURITY: Never commit credentials ---
+.env
+.env.*
+!.env.example
+
+# --- Jekyll ---
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+vendor/
+
+# --- Ruby / Bundler ---
+Gemfile.lock
+.bundle/
+
+# --- OS Generated Files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editor / IDE Files ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Logs & Temp Files ---
+*.log
+*.tmp
+*.temp
+*.bak
+
+# --- Node.js (if you add a build step later) ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# --- Deployment Cache ---
+.vercel
+.netlify
+.cache/
+
+# --- Misc ---
+*.orig
+*.rej
