@@ -18,6 +18,11 @@ const CONFIG = {
     afternoon: 'good afternoon,',
     evening: 'good evening,',
     night: 'still awake?'
+  },
+  github: {
+    owner: 'zurai02',
+    repo: 'Blog',
+    path: 'posts.json'
   }
 };
 
@@ -154,13 +159,18 @@ function setGreeting() {
 let postsData = [];
 let adminCreds = { email: '', password: '' };
 
-async function loadPosts() {
+// includeDrafts: when false (default), draft posts are stripped out —
+// use this for anything the public sees. Pass true only for admin views
+// or an admin previewing their own draft.
+async function loadPosts(includeDrafts = false) {
   try {
     const res = await fetch('posts.json');
-    postsData = await res.json();
-    if (!Array.isArray(postsData)) postsData = [];
-    postsData.sort((a, b) => new Date(b.date) - new Date(a.date));
-    return postsData;
+    let posts = await res.json();
+    if (!Array.isArray(posts)) posts = [];
+    if (!includeDrafts) posts = posts.filter(p => !p.draft);
+    posts.sort((a, b) => new Date(b.date) - new Date(a.date));
+    postsData = posts;
+    return posts;
   } catch (e) {
     console.error('Failed to load posts:', e);
     postsData = [];
@@ -277,9 +287,9 @@ function filterByTag(tag) {
   renderPosts();
 }
 
-// ─── RENDER POSTS ────────────────────────────
+// ─── RENDER POSTS (public) ───────────────────
 async function renderPosts() {
-  let posts = await loadPosts();
+  let posts = await loadPosts(); // drafts excluded
   posts = filterPosts(posts);
   posts = sortPosts(posts);
 
@@ -311,7 +321,7 @@ async function renderPosts() {
 
   document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-  // Update tag cloud
+  // Update tag cloud (public posts only)
   const allPosts = await loadPosts();
   renderTagCloud(allPosts);
 }
@@ -320,7 +330,10 @@ async function renderPosts() {
 async function loadPost(postId) {
   if (!postId) { location.href = '/Blog'; return; }
 
-  const posts = await loadPosts();
+  // An admin who's logged in on this browser can preview their own drafts
+  // by visiting the post URL directly; everyone else only sees published posts.
+  const isAdmin = localStorage.getItem('zurai_admin') === 'true';
+  const posts = await loadPosts(isAdmin);
   const post = posts.find(p => p.id === postId);
   if (!post) {
     console.error('Post not found:', postId);
@@ -339,6 +352,9 @@ async function loadPost(postId) {
   document.getElementById('post-tags').innerHTML = post.tags
     .map(t => `<span class="tag">${t}</span>`).join('');
   document.getElementById('post-content').innerHTML = markdownToHtml(post.content);
+
+  const draftBanner = document.getElementById('draft-banner');
+  if (draftBanner) draftBanner.style.display = post.draft ? 'block' : 'none';
 
   // Add copy buttons to code blocks
   document.querySelectorAll('.post-content pre').forEach(pre => {
@@ -503,6 +519,133 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ─── GITHUB SYNC ──────────────────────────────
+// Commits posts.json straight to github.com/<owner>/<repo> using the
+// GitHub Contents API. Requires a personal access token with "repo" scope,
+// entered by the admin. The token lives only in sessionStorage (this tab,
+// this session) — it is never written into any file this app ships.
+
+function getGithubToken() {
+  return sessionStorage.getItem('zurai_gh_token') || '';
+}
+
+function setGithubToken(token) {
+  if (token) sessionStorage.setItem('zurai_gh_token', token);
+  else sessionStorage.removeItem('zurai_gh_token');
+}
+
+function connectGithub() {
+  const input = document.getElementById('github-token-input');
+  if (!input) return;
+  const token = input.value.trim();
+  if (!token) return;
+  setGithubToken(token);
+  input.value = '';
+  updateGithubStatusDisplay('token saved for this session ✓');
+}
+
+function disconnectGithub() {
+  setGithubToken('');
+  updateGithubStatusDisplay('disconnected');
+}
+
+function updateGithubStatusDisplay(message) {
+  const statusEl = document.getElementById('github-status');
+  if (!statusEl) return;
+  if (message) {
+    statusEl.textContent = message;
+    return;
+  }
+  statusEl.textContent = getGithubToken()
+    ? 'connected for this session'
+    : 'not connected — saving will download posts.json instead';
+}
+
+// UTF-8 safe base64 encode (posts can contain non-ASCII characters)
+function utf8ToBase64(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+async function githubApiRequest(method, body) {
+  const token = getGithubToken();
+  const url = `https://api.github.com/repos/${CONFIG.github.owner}/${CONFIG.github.repo}/contents/${CONFIG.github.path}`;
+  const opts = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json'
+    }
+  };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  return fetch(url, opts);
+}
+
+async function getRemoteFileSha() {
+  const res = await githubApiRequest('GET');
+  if (res.status === 200) {
+    const data = await res.json();
+    return data.sha;
+  }
+  if (res.status === 404) return null;
+  const err = await res.json().catch(() => ({}));
+  throw new Error(err.message || `GitHub error ${res.status}`);
+}
+
+function downloadPostsJson() {
+  const blob = new Blob([JSON.stringify(postsData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'posts.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Commits the current in-memory postsData straight to posts.json on GitHub.
+// Falls back to a local download if no token is set, or if the commit fails.
+async function commitPostsToGithub(commitMessage) {
+  const statusEl = document.getElementById('github-status');
+  const token = getGithubToken();
+
+  if (!token) {
+    if (statusEl) statusEl.textContent = 'no GitHub token set — downloading posts.json instead.';
+    downloadPostsJson();
+    return false;
+  }
+
+  if (statusEl) statusEl.textContent = 'syncing to GitHub…';
+
+  try {
+    const sha = await getRemoteFileSha();
+    const content = utf8ToBase64(JSON.stringify(postsData, null, 2));
+    const body = { message: commitMessage, content };
+    if (sha) body.sha = sha;
+
+    const res = await githubApiRequest('PUT', body);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `GitHub error ${res.status}`);
+    }
+    const data = await res.json();
+    if (statusEl) {
+      const shortSha = data.commit && data.commit.sha ? data.commit.sha.substring(0, 7) : '';
+      statusEl.textContent = `synced ✓ ${shortSha ? '(commit ' + shortSha + ')' : ''}`;
+      setTimeout(() => {
+        if (statusEl.textContent.startsWith('synced')) updateGithubStatusDisplay();
+      }, 4000);
+    }
+    return true;
+  } catch (e) {
+    console.error('GitHub sync failed:', e);
+    if (statusEl) statusEl.textContent = `sync failed: ${e.message} — downloading posts.json instead.`;
+    downloadPostsJson();
+    return false;
+  }
+}
+
 // ─── ADMIN AUTH ──────────────────────────────
 async function loadAdminConfig() {
   try {
@@ -532,26 +675,45 @@ async function attemptLogin() {
     document.getElementById('admin-login').style.display = 'none';
     document.getElementById('admin-dashboard').style.display = 'block';
     await renderAdminPosts();
+    updateGithubStatusDisplay();
   } else {
     errorEl.textContent = 'invalid credentials';
     setTimeout(() => errorEl.textContent = '', 3000);
   }
 }
 
+// ─── ADMIN POST LIST (includes drafts) ───────
+let adminFilter = 'all'; // 'all' | 'published' | 'draft'
+
+function setAdminFilter(filter) {
+  adminFilter = filter;
+  document.querySelectorAll('#admin-filter-tabs .tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.filter === filter);
+  });
+  renderAdminPosts();
+}
+
 async function renderAdminPosts() {
-  const posts = await loadPosts();
+  let posts = await loadPosts(true); // include drafts
+
+  if (adminFilter === 'published') posts = posts.filter(p => !p.draft);
+  if (adminFilter === 'draft') posts = posts.filter(p => p.draft);
+
   const list = document.getElementById('admin-posts-list');
   if (!list) return;
 
   if (posts.length === 0) {
-    list.innerHTML = '<p class="no-posts">No posts yet. Create your first one!</p>';
+    list.innerHTML = '<p class="no-posts">No posts here yet.</p>';
     return;
   }
 
   list.innerHTML = posts.map(post => `
     <div class="admin-post-item">
       <div class="admin-post-info">
-        <span class="admin-post-title">${escapeHtml(post.title)}</span>
+        <span class="admin-post-title">
+          ${escapeHtml(post.title)}
+          ${post.draft ? '<span class="draft-badge">draft</span>' : ''}
+        </span>
         <span class="admin-post-date">${post.date} · ${post.id}</span>
       </div>
       <div class="admin-post-actions">
@@ -581,6 +743,7 @@ function showEditor(id = null) {
       document.getElementById('edit-date').value = post.date;
       document.getElementById('edit-tags').value = post.tags.join(', ');
       document.getElementById('edit-content').value = post.content;
+      document.getElementById('edit-draft').checked = !!post.draft;
     }
   } else {
     label.textContent = 'new post';
@@ -590,6 +753,8 @@ function showEditor(id = null) {
     document.getElementById('edit-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('edit-tags').value = '';
     document.getElementById('edit-content').value = '';
+    // New posts default to draft so nothing publishes by accident.
+    document.getElementById('edit-draft').checked = true;
   }
 }
 
@@ -598,12 +763,13 @@ function closeEditor() {
   editingId = null;
 }
 
-function savePost() {
+async function savePost() {
   const id = editingId || document.getElementById('edit-id').value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const title = document.getElementById('edit-title').value.trim();
   const date = document.getElementById('edit-date').value;
   const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
   const content = document.getElementById('edit-content').value;
+  const draft = document.getElementById('edit-draft').checked;
 
   if (!id) {
     alert('Post ID is required (used in the URL)');
@@ -618,13 +784,17 @@ function savePost() {
     return;
   }
 
+  // Reload the full set (including drafts) so we don't clobber posts
+  // that were filtered out of the currently-rendered admin view.
+  await loadPosts(true);
+
   if (!editingId && postsData.some(p => p.id === id)) {
     alert(`A post with ID "${id}" already exists. Use a different ID.`);
     return;
   }
 
   const existingIndex = postsData.findIndex(p => p.id === id);
-  const newPost = { id, title, date: date || new Date().toISOString().split('T')[0], tags, content };
+  const newPost = { id, title, date: date || new Date().toISOString().split('T')[0], tags, content, draft };
 
   if (existingIndex >= 0) {
     postsData[existingIndex] = newPost;
@@ -634,34 +804,28 @@ function savePost() {
 
   postsData.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const blob = new Blob([JSON.stringify(postsData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'posts.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  const commitMessage = existingIndex >= 0
+    ? `Update post: ${title}`
+    : `Add ${draft ? 'draft' : ''} post: ${title}`.replace('  ', ' ');
+
+  await commitPostsToGithub(commitMessage);
 
   closeEditor();
   renderAdminPosts();
-  alert('posts.json downloaded. Replace the old one and redeploy to update your blog.');
 }
 
 function editPost(id) {
   showEditor(id);
 }
 
-function deletePost(id) {
+async function deletePost(id) {
   if (!confirm('Delete this post? This cannot be undone.')) return;
+
+  await loadPosts(true);
+  const post = postsData.find(p => p.id === id);
   postsData = postsData.filter(p => p.id !== id);
 
-  const blob = new Blob([JSON.stringify(postsData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'posts.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  await commitPostsToGithub(`Delete post: ${post ? post.title : id}`);
 
   renderAdminPosts();
 }
@@ -708,6 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('admin-login').style.display = 'none';
         document.getElementById('admin-dashboard').style.display = 'block';
         renderAdminPosts();
+        updateGithubStatusDisplay();
       }
     });
 
