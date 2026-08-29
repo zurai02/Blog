@@ -3,17 +3,260 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>zurai02 — admin</title>
-  <meta name="description" content="Admin panel for zurai02 blog.">
+  <title>zurai02 — blog</title>
+  <meta name="description" content="Thoughts on Luau, systems programming, and squeezing frames.">
+  <meta property="og:title" content="zurai02 — blog">
+  <meta property="og:description" content="Thoughts on Luau, systems programming, and squeezing frames.">
+  <meta property="og:type" content="website">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0a0f'/><text x='50' y='68' font-family='JetBrains Mono, monospace' font-size='60' font-weight='700' fill='%237c5cff' text-anchor='middle'>Z</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* ─── GITHUB AUTH STYLES ───────────────────────────── */
+    .auth-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 101;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0.5rem 2.5rem;
+      background: rgba(10, 10, 15, 0.5);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      gap: 0.8rem;
+    }
+    .auth-bar .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .auth-bar .user-chip img {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+    }
+    .auth-bar .user-chip .user-name {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .btn-auth {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.9rem;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      text-decoration: none;
+    }
+    .btn-auth:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+    .btn-auth svg {
+      width: 14px; height: 14px;
+      fill: currentColor;
+    }
+    .btn-auth.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-auth.primary:hover {
+      background: #9175ff;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .btn-auth.danger {
+      border-color: rgba(248,81,73,0.3);
+      color: #f85149;
+    }
+    .btn-auth.danger:hover {
+      background: rgba(248,81,73,0.1);
+      border-color: #f85149;
+    }
+
+    /* New Post FAB */
+    .fab-new-post {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      z-index: 90;
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      font-size: 1.6rem;
+      cursor: pointer;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      transition: all var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: scale(0.8);
+      pointer-events: none;
+    }
+    .fab-new-post.visible {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+    .fab-new-post:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 30px var(--accent-glow);
+    }
+
+    /* Public Editor Overlay */
+    .public-editor-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10, 10, 15, 0.9);
+      backdrop-filter: blur(12px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .public-editor-overlay.active {
+      display: flex;
+    }
+    .public-editor-card {
+      width: 100%;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .public-editor-card .editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.2rem;
+    }
+    .public-editor-card .editor-header h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    .public-editor-card input,
+    .public-editor-card textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.85rem 1rem;
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      margin-bottom: 0.8rem;
+      transition: border-color var(--transition);
+      outline: none;
+    }
+    .public-editor-card input:focus,
+    .public-editor-card textarea:focus {
+      border-color: var(--accent);
+    }
+    .public-editor-card textarea {
+      min-height: 250px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      resize: vertical;
+    }
+    .public-editor-card .editor-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.8rem;
+      margin-top: 0.5rem;
+    }
+    .public-editor-card .login-hint {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    .public-editor-card .login-hint a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .public-editor-card .login-hint a:hover {
+      text-decoration: underline;
+    }
+
+    /* Post author badge on cards */
+    .post-card-author {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+    }
+    .post-card-author img {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+    }
+    .post-card-author span {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.8rem 1.4rem;
+      font-size: 0.85rem;
+      color: var(--text);
+      z-index: 300;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    .toast.success { border-color: rgba(74,222,128,0.4); color: #4ade80; }
+    .toast.error { border-color: rgba(248,81,73,0.4); color: #f85149; }
+
+    @media (max-width: 640px) {
+      .auth-bar { padding: 0.5rem 1.2rem; }
+      .auth-bar .user-chip .user-name { display: none; }
+    }
+  </style>
 </head>
 <body>
   <canvas id="particle-canvas"></canvas>
 
-  <nav class="nav">
+  <!-- Auth Bar -->
+  <div class="auth-bar" id="auth-bar">
+    <span id="auth-content">
+      <a class="btn-auth" id="github-signin-btn" href="#">
+        <svg viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8z"/></svg>
+        Sign in with GitHub
+      </a>
+    </span>
+  </div>
+
+  <nav class="nav" style="top: 40px;">
     <a href="/Blog" class="nav-brand">zurai02</a>
     <div class="nav-links" id="nav-links">
       <a href="/Blog">blog</a>
@@ -26,95 +269,460 @@
     </button>
   </nav>
 
-  <main class="container">
-    <!-- Login Screen -->
-    <div class="admin-login" id="admin-login">
-      <div class="glass-card login-card">
-        <h2>admin access</h2>
-        <p class="login-subtitle">Enter credentials to manage posts</p>
-        <input type="email" id="login-email" placeholder="email" autocomplete="email">
-        <input type="password" id="login-password" placeholder="password" autocomplete="current-password">
-        <button class="btn-primary" id="login-btn" onclick="attemptLogin()">authenticate</button>
-        <p class="login-error" id="login-error"></p>
+  <main class="container" style="padding-top: 8.5rem;">
+    <header class="hero">
+      <div class="hero-greeting" id="greeting"></div>
+      <h1 class="hero-title">
+        <span class="typewriter" id="typewriter"></span><span class="cursor">|</span>
+      </h1>
+      <p class="hero-subtitle">Thoughts on Luau, systems programming, and squeezing frames.</p>
+      <div class="hero-search">
+        <input type="text" id="search-input" placeholder="Search posts..." autocomplete="off">
+        <span class="search-icon">⌕</span>
       </div>
-    </div>
+    </header>
 
-    <!-- Admin Dashboard -->
-    <div class="admin-dashboard" id="admin-dashboard" style="display:none;">
-      <div class="admin-header">
-        <h2>post manager</h2>
-        <button class="btn-primary" onclick="showEditor()">+ new post</button>
-      </div>
-
-      <!-- GitHub sync panel -->
-      <div class="glass-card github-connect">
-        <p class="github-connect-label">GitHub sync — commits directly to zurai02/Blog/posts.json</p>
-        <div class="github-connect-row">
-          <input type="password" id="github-token-input" placeholder="GitHub personal access token (repo scope)" autocomplete="off">
-          <button class="btn-ghost btn-small" onclick="connectGithub()">connect</button>
-          <button class="btn-ghost btn-small" onclick="disconnectGithub()">disconnect</button>
-        </div>
-        <p class="github-status" id="github-status"></p>
-        <p class="github-note">Token is kept only in this tab's session storage — it clears when the tab closes and is never written to any file. Without a token, saving falls back to downloading posts.json.</p>
-      </div>
-
-      <div class="admin-filter-tabs" id="admin-filter-tabs">
-        <button class="tab active" data-filter="all" onclick="setAdminFilter('all')">all</button>
-        <button class="tab" data-filter="published" onclick="setAdminFilter('published')">published</button>
-        <button class="tab" data-filter="draft" onclick="setAdminFilter('draft')">drafts</button>
-      </div>
-
-      <div class="admin-posts-list" id="admin-posts-list"></div>
-
-      <!-- Editor -->
-      <div class="editor-overlay" id="editor-overlay" style="display:none;">
-        <div class="glass-card editor-card">
-          <div class="editor-header">
-            <h3 id="editor-title-label">new post</h3>
-            <button class="btn-ghost" onclick="closeEditor()">×</button>
-          </div>
-          <input type="text" id="edit-id" placeholder="post-id (url-safe, no spaces)" style="display:none;">
-          <input type="text" id="edit-title" placeholder="Post Title">
-          <input type="date" id="edit-date">
-          <input type="text" id="edit-tags" placeholder="tags (comma separated)">
-          <input type="text" id="edit-author" placeholder="author username">
-          <textarea id="edit-content" placeholder="Write your post in markdown..."></textarea>
-          <label class="checkbox-label">
-            <input type="checkbox" id="edit-draft">
-            save as draft (won't show on the public blog)
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="edit-verified">
-            verified badge (shows a checkmark next to the author name)
-          </label>
-          <div class="editor-actions">
-            <button class="btn-ghost" onclick="closeEditor()">cancel</button>
-            <button class="btn-primary" onclick="savePost()">save post</button>
-          </div>
+    <section class="posts-section">
+      <div class="section-header">
+        <span class="section-label">posts</span>
+        <div class="section-filters">
+          <span class="post-count" id="post-count"></span>
+          <select id="sort-select">
+            <option value="date-desc">Newest</option>
+            <option value="date-asc">Oldest</option>
+            <option value="title-asc">A–Z</option>
+          </select>
         </div>
       </div>
-    </div>
+      <div class="posts-grid" id="posts-grid"></div>
+      <div class="no-results" id="no-results" style="display:none">
+        <p>No posts match your search.</p>
+      </div>
+    </section>
+
+    <section class="tag-cloud-section">
+      <div class="section-header">
+        <span class="section-label">tags</span>
+      </div>
+      <div class="tag-cloud" id="tag-cloud"></div>
+    </section>
   </main>
 
-  <footer class="footer">
-    <span>zurai02</span>
-    <span class="footer-right">
-      <a href="https://github.com/zurai02" target="_blank">GitHub</a>
-      <a href="https://devforum.roblox.com/u/zurai02" target="_blank">DevForum</a>
-      <a href="https://zurai02.is-a.dev" target="_blank">Portfolio</a>
-    </span>
-  </footer>
+  <!-- New Post FAB -->
+  <button class="fab-new-post" id="fab-new-post" onclick="openPublicEditor()" title="New Post">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+  </button>
+
+  <!-- Public Editor Overlay -->
+  <div class="public-editor-overlay" id="public-editor-overlay">
+    <div class="glass-card public-editor-card">
+      <div class="editor-header">
+        <h3 id="public-editor-title">new post</h3>
+        <button class="btn-ghost" onclick="closePublicEditor()">×</button>
+      </div>
+      <div class="login-hint" id="editor-login-hint" style="display:none;">
+        <a href="#" onclick="signInWithGitHub(); return false;">Sign in with GitHub</a> to publish your post
+      </div>
+      <input type="text" id="pub-edit-id" placeholder="post-id (url-safe, no spaces)" style="display:none;">
+      <input type="text" id="pub-edit-title" placeholder="Post Title">
+      <input type="date" id="pub-edit-date">
+      <input type="text" id="pub-edit-tags" placeholder="tags (comma separated)">
+      <textarea id="pub-edit-content" placeholder="Write your post in markdown..."></textarea>
+      <div class="editor-actions">
+        <button class="btn-ghost" onclick="closePublicEditor()">cancel</button>
+        <button class="btn-primary" id="pub-save-btn" onclick="savePublicPost()">publish post</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
 
   <script src="site.js"></script>
   <script>
-    (function(){
-      if (localStorage.getItem('zurai_admin') === 'true') {
-        document.getElementById('admin-login').style.display = 'none';
-        document.getElementById('admin-dashboard').style.display = 'block';
-        renderAdminPosts();
-        updateGithubStatusDisplay();
+    // ═══════════════════════════════════════════════════════
+    // GITHUB OAUTH 2.0 — PUBLIC SIGN-IN & POSTING
+    // ═══════════════════════════════════════════════════════
+
+    const GITHUB_CONFIG = {
+      clientId: 'Ov23limdCh9gLE61RQ8a',
+      redirectUri: 'https://zurai02.github.io/Blog/',
+      scope: 'read:user user:email',
+      authUrl: 'https://github.com/login/oauth/authorize'
+    };
+
+    // ─── State Management ────────────────────────────────
+    function generateState() {
+      const arr = new Uint8Array(16);
+      crypto.getRandomValues(arr);
+      return Array.from(arr, b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    function getGitHubUser() {
+      try { return JSON.parse(localStorage.getItem('github_user') || 'null'); }
+      catch { return null; }
+    }
+
+    function setGitHubUser(user) {
+      if (user) localStorage.setItem('github_user', JSON.stringify(user));
+      else localStorage.removeItem('github_user');
+    }
+
+    function getGitHubToken() {
+      return localStorage.getItem('github_access_token') || '';
+    }
+
+    function setGitHubToken(token) {
+      if (token) localStorage.setItem('github_access_token', token);
+      else localStorage.removeItem('github_access_token');
+    }
+
+    // ─── Toast ───────────────────────────────────────────
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + type;
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ─── Auth UI ─────────────────────────────────────────
+    function renderAuthBar() {
+      const user = getGitHubUser();
+      const container = document.getElementById('auth-content');
+      const fab = document.getElementById('fab-new-post');
+
+      if (user) {
+        container.innerHTML = `
+          <div class="user-chip">
+            <img src="${user.avatar_url}" alt="avatar" onerror="this.src='https://github.com/ghost.png'">
+            <span class="user-name">${user.login}</span>
+          </div>
+          <button class="btn-auth danger" onclick="signOutGitHub()">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 010 1.5h-2.5a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 010 1.5h-2.5A1.75 1.75 0 012 13.25V2.75zm10.44 4.5H6.75a.75.75 0 000 1.5h5.69l-1.97 1.97a.75.75 0 101.06 1.06l3.25-3.25a.75.75 0 000-1.06L11.53 3.22a.75.75 0 10-1.06 1.06l1.97 1.97z"/></svg>
+            Sign out
+          </button>
+        `;
+        fab.classList.add('visible');
+      } else {
+        container.innerHTML = `
+          <a class="btn-auth primary" id="github-signin-btn" href="#" onclick="signInWithGitHub(); return false;">
+            <svg viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8z"/></svg>
+            Sign in with GitHub
+          </a>
+        `;
+        fab.classList.remove('visible');
       }
-    })();
+    }
+
+    // ─── Sign In ─────────────────────────────────────────
+    function signInWithGitHub() {
+      const state = generateState();
+      localStorage.setItem('github_oauth_state', state);
+
+      const params = new URLSearchParams({
+        client_id: GITHUB_CONFIG.clientId,
+        redirect_uri: GITHUB_CONFIG.redirectUri,
+        scope: GITHUB_CONFIG.scope,
+        state: state,
+        allow_signup: 'true'
+      });
+
+      window.location.href = `${GITHUB_CONFIG.authUrl}?${params.toString()}`;
+    }
+
+    function signOutGitHub() {
+      setGitHubUser(null);
+      setGitHubToken('');
+      localStorage.removeItem('github_oauth_state');
+      renderAuthBar();
+      showToast('Signed out');
+    }
+
+    // ─── Handle OAuth Callback ───────────────────────────
+    async function handleOAuthCallback() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      const error = urlParams.get('error');
+
+      if (error) {
+        showToast('Auth failed: ' + error, 'error');
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      if (!code || !state) return;
+
+      const savedState = localStorage.getItem('github_oauth_state');
+      if (state !== savedState) {
+        showToast('Security error: state mismatch', 'error');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      // Clean URL immediately
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // ─── EXCHANGE CODE FOR TOKEN ─────────────────────
+      // We use a CORS proxy to call GitHub's token endpoint
+      // In production, you should use your own backend
+      showToast('Exchanging code for token...');
+
+      try {
+        // Try multiple CORS proxies
+        const proxyUrls = [
+          'https://corsproxy.io/?',
+          'https://api.allorigins.win/raw?url=',
+          'https://api.codetabs.com/v1/proxy?quest='
+        ];
+
+        const tokenUrl = 'https://github.com/login/oauth/access_token';
+        const body = new URLSearchParams({
+          client_id: GITHUB_CONFIG.clientId,
+          client_secret: 'ff426a931e2c7c83fc73a6d8707d89440e5fe923',
+          code: code,
+          redirect_uri: GITHUB_CONFIG.redirectUri,
+          state: state
+        });
+
+        let tokenData = null;
+        let lastErr = null;
+
+        for (const proxy of proxyUrls) {
+          try {
+            const res = await fetch(proxy + encodeURIComponent(tokenUrl), {
+              method: 'POST',
+              headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: body.toString()
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.access_token) {
+                tokenData = data;
+                break;
+              }
+            }
+          } catch (e) { lastErr = e; }
+        }
+
+        // Fallback: try direct fetch (may work on some browsers/configs)
+        if (!tokenData) {
+          try {
+            const res = await fetch(tokenUrl, {
+              method: 'POST',
+              headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: body.toString()
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.access_token) tokenData = data;
+            }
+          } catch (e) { /* ignore */ }
+        }
+
+        if (!tokenData || !tokenData.access_token) {
+          showToast('Could not exchange code. Try signing in again.', 'error');
+          return;
+        }
+
+        setGitHubToken(tokenData.access_token);
+
+        // Fetch user profile
+        const userRes = await fetch('https://api.github.com/user', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Accept': 'application/vnd.github+json'
+          }
+        });
+
+        if (!userRes.ok) {
+          showToast('Could not fetch user profile', 'error');
+          return;
+        }
+
+        const user = await userRes.json();
+        setGitHubUser(user);
+        renderAuthBar();
+        showToast(`Welcome, ${user.login}!`);
+
+      } catch (e) {
+        console.error('OAuth error:', e);
+        showToast('Authentication failed. Please try again.', 'error');
+      }
+    }
+
+    // ─── Public Editor ───────────────────────────────────
+    function openPublicEditor() {
+      const user = getGitHubUser();
+      const overlay = document.getElementById('public-editor-overlay');
+      const hint = document.getElementById('editor-login-hint');
+      const saveBtn = document.getElementById('pub-save-btn');
+
+      // Reset fields
+      document.getElementById('pub-edit-id').value = '';
+      document.getElementById('pub-edit-title').value = '';
+      document.getElementById('pub-edit-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('pub-edit-tags').value = '';
+      document.getElementById('pub-edit-content').value = '';
+      document.getElementById('public-editor-title').textContent = 'new post';
+
+      if (!user) {
+        hint.style.display = 'block';
+        saveBtn.textContent = 'sign in to publish';
+        saveBtn.onclick = function() { signInWithGitHub(); };
+      } else {
+        hint.style.display = 'none';
+        saveBtn.textContent = 'publish post';
+        saveBtn.onclick = savePublicPost;
+      }
+
+      overlay.classList.add('active');
+    }
+
+    function closePublicEditor() {
+      document.getElementById('public-editor-overlay').classList.remove('active');
+    }
+
+    async function savePublicPost() {
+      const user = getGitHubUser();
+      if (!user) {
+        signInWithGitHub();
+        return;
+      }
+
+      const id = document.getElementById('pub-edit-id').value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const title = document.getElementById('pub-edit-title').value.trim();
+      const date = document.getElementById('pub-edit-date').value;
+      const tags = document.getElementById('pub-edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+      const content = document.getElementById('pub-edit-content').value;
+
+      if (!id) { showToast('Post ID is required', 'error'); return; }
+      if (!title) { showToast('Title is required', 'error'); return; }
+      if (!content) { showToast('Content is required', 'error'); return; }
+
+      // Load current posts
+      let posts = [];
+      try {
+        const res = await fetch('posts.json');
+        posts = await res.json();
+        if (!Array.isArray(posts)) posts = [];
+      } catch (e) { posts = []; }
+
+      if (posts.some(p => p.id === id)) {
+        showToast('A post with that ID already exists', 'error');
+        return;
+      }
+
+      const newPost = {
+        id, title,
+        date: date || new Date().toISOString().split('T')[0],
+        tags,
+        content,
+        author: user.login,
+        author_avatar: user.avatar_url,
+        draft: false
+      };
+
+      posts.push(newPost);
+      posts.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      // Try to commit via GitHub API if token available
+      const token = getGitHubToken();
+      if (token) {
+        try {
+          const owner = 'zurai02';
+          const repo = 'Blog';
+          const path = 'posts.json';
+
+          // Get current file SHA
+          const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+          });
+
+          let sha = null;
+          if (shaRes.ok) {
+            const shaData = await shaRes.json();
+            sha = shaData.sha;
+          }
+
+          const body = {
+            message: `Add post: ${title} by ${user.login}`,
+            content: btoa(unescape(encodeURIComponent(JSON.stringify(posts, null, 2)))),
+            ...(sha && { sha })
+          };
+
+          const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+          });
+
+          if (putRes.ok) {
+            showToast('Post published to GitHub!');
+            closePublicEditor();
+            // Reload posts
+            setTimeout(() => renderPosts(), 500);
+            return;
+          }
+        } catch (e) {
+          console.error('GitHub commit failed:', e);
+        }
+      }
+
+      // Fallback: download posts.json
+      const blob = new Blob([JSON.stringify(posts, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'posts.json';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showToast('Post saved! Download posts.json and commit it.', 'success');
+      closePublicEditor();
+      setTimeout(() => renderPosts(), 500);
+    }
+
+    // ─── Override renderPostCard to show author ──────────
+    const originalRenderPostCard = renderPostCard;
+    renderPostCard = function(post) {
+      const excerpt = post.content
+        .replace(/```[\s\S]*?```/g, '[code]')
+        .replace(/[#*_`]/g, '')
+        .substring(0, 140) + '...';
+
+      const tagsHtml = post.tags.map(t => `<span class="tag">${t}</span>`).join('');
+
+      const authorHtml = post.author
+        ? `<div class="post-card-author">
+             <img src="${post.author_avatar || 'https://github.com/ghost.png'}" alt="" onerror="this.src='https://github.com/ghost.png'">
+             <span>@${post.author}</span>
+           </div>`
+        : '';
+
+      return `
+        <a href="post.html?id=${post.id}" class="post-card reveal">
+          ${authorHtml}
+          <div class="post-card-header">
+            <span class="post-card-title">${escapeHtml(post.title)}</span>
+            <span class="post-card-date">${post.date}</span>
+          </div>
+          <p class="post-card-excerpt">${escapeHtml(excerpt)}</p>
+          <div class="post-card-tags">${tagsHtml}</div>
+        </a>
+      `;
+    };
+
+    // ─── Init ────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      renderAuthBar();
+      handleOAuthCallback();
+    });
   </script>
 </body>
-</html>
+        </html>
