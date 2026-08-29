@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub OAuth 2.0 Sign-In</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #c9d1d9;
+            overflow: hidden;
+        }
+
+        /* Particle Background */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: rgba(88, 166, 255, 0.4);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-10vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 520px;
+            padding: 20px;
+        }
+
+        /* Glass Card */
+        .glass-card {
+            background: rgba(22, 27, 34, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(48, 54, 61, 0.6);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(88, 166, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(88, 166, 255, 0.03) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .github-icon {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            fill: #f0f6fc;
+            filter: drop-shadow(0 0 20px rgba(88, 166, 255, 0.3));
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #8b949e;
+            line-height: 1.5;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.pending {
+            background: rgba(210, 153, 34, 0.15);
+            color: #d29922;
+            border: 1px solid rgba(210, 153, 34, 0.3);
+        }
+
+        .status-badge.authenticated {
+            background: rgba(35, 197, 94, 0.15);
+            color: #3fb950;
+            border: 1px solid rgba(35, 197, 94, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: blink 2s infinite;
+        }
+
+        .status-badge.pending .status-dot {
+            background: #d29922;
+        }
+
+        .status-badge.authenticated .status-dot {
+            background: #3fb950;
+            animation: none;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Form Fields */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #c9d1d9;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(13, 17, 23, 0.8);
+            border: 1px solid rgba(48, 54, 61, 0.8);
+            border-radius: 10px;
+            color: #f0f6fc;
+            font-size: 14px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+        }
+
+        .form-input::placeholder {
+            color: #484f58;
+        }
+
+        .input-hint {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .input-hint svg {
+            width: 14px;
+            height: 14px;
+            fill: #8b949e;
+        }
+
+        /* Redirect URI Section */
+        .redirect-section {
+            background: rgba(13, 17, 23, 0.6);
+            border: 1px solid rgba(48, 54, 61, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .redirect-section h3 {
+            font-size: 14px;
+            color: #f0f6fc;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .redirect-uri-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(88, 166, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            color: #58a6ff;
+            word-break: break-all;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .redirect-uri-box:hover {
+            border-color: rgba(88, 166, 255, 0.5);
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(48, 54, 61, 0.8);
+            border: 1px solid rgba(48, 54, 61, 1);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            color: #c9d1d9;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .copy-btn:hover {
+            background: rgba(88, 166, 255, 0.2);
+            border-color: #58a6ff;
+            color: #58a6ff;
+        }
+
+        .copy-btn.copied {
+            background: rgba(35, 197, 94, 0.2);
+            border-color: #3fb950;
+            color: #3fb950;
+        }
+
+        /* Sign In Button */
+        .signin-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #2ea043 0%, #238636 100%);
+            border: 1px solid rgba(46, 160, 67, 0.4);
+            border-radius: 10px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .signin-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .signin-btn:hover::before {
+            left: 100%;
+        }
+
+        .signin-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(46, 160, 67, 0.3);
+            border-color: rgba(46, 160, 67, 0.6);
+        }
+
+        .signin-btn:active {
+            transform: translateY(0);
+        }
+
+        .signin-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .signin-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* User Profile Card */
+        .profile-card {
+            display: none;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .profile-card.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .profile-avatar {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            border: 3px solid rgba(88, 166, 255, 0.3);
+            margin: 0 auto 16px;
+            box-shadow: 0 0 30px rgba(88, 166, 255, 0.2);
+        }
+
+        .profile-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin-bottom: 4px;
+        }
+
+        .profile-login {
+            font-size: 14px;
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+
+        .profile-stats {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #f0f6fc;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .signout-btn {
+            padding: 10px 24px;
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            color: #f85149;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .signout-btn:hover {
+            background: rgba(248, 81, 73, 0.2);
+            border-color: rgba(248, 81, 73, 0.5);
+        }
+
+        /* Steps Guide */
+        .steps-guide {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(48, 54, 61, 0.5);
+        }
+
+        .steps-guide h3 {
+            font-size: 14px;
+            color: #f0f6fc;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 14px;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            background: rgba(88, 166, 255, 0.15);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #58a6ff;
+        }
+
+        .step-content {
+            font-size: 13px;
+            color: #8b949e;
+            line-height: 1.5;
+        }
+
+        .step-content a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+
+        .step-content a:hover {
+            text-decoration: underline;
+        }
+
+        .step-content code {
+            background: rgba(110, 118, 129, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', monospace;
+            font-size: 12px;
+            color: #d29922;
+        }
+
+        /* Terminal Output */
+        .terminal {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(48, 54, 61, 0.5);
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 20px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #7ee787;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .terminal-header {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .terminal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.red { background: #f85149; }
+        .terminal-dot.yellow { background: #d29922; }
+        .terminal-dot.green { background: #3fb950; }
+
+        .terminal-line {
+            margin-bottom: 4px;
+        }
+
+        .terminal-line .prompt {
+            color: #58a6ff;
+        }
+
+        .terminal-line .cmd {
+            color: #e6edf3;
+        }
+
+        .terminal-line .output {
+            color: #8b949e;
+        }
+
+        .terminal-line .success {
+            color: #3fb950;
+        }
+
+        .terminal-line .error {
+            color: #f85149;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(22, 27, 34, 0.95);
+            border: 1px solid rgba(48, 54, 61, 0.8);
+            border-radius: 10px;
+            padding: 14px 24px;
+            font-size: 14px;
+            color: #f0f6fc;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-color: rgba(35, 197, 94, 0.4);
+        }
+
+        .toast.error {
+            border-color: rgba(248, 81, 73, 0.4);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(48, 54, 61, 0.8);
+            border-radius: 3px;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .glass-card {
+                padding: 24px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Particles Background -->
+    <div class="particles" id="particles"></div>
+
+    <div class="container">
+        <div class="glass-card">
+            <!-- Status Badge -->
+            <div style="text-align: center; margin-bottom: 20px;">
+                <span class="status-badge pending" id="statusBadge">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Not Authenticated</span>
+                </span>
+            </div>
+
+            <!-- Header -->
+            <div class="header" id="authHeader">
+                <svg class="github-icon" viewBox="0 0 24 24">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                <h1>GitHub OAuth 2.0</h1>
+                <p>Sign in with your GitHub account to access the blog admin panel</p>
+            </div>
+
+            <!-- Auth Form -->
+            <div id="authForm">
+                <!-- Client ID Input -->
+                <div class="form-group">
+                    <label class="form-label">GitHub OAuth App Client ID</label>
+                    <input type="text" class="form-input" id="clientId" placeholder="Ov23li..." autocomplete="off">
+                    <div class="input-hint">
+                        <svg viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm9 3a1 1 0 11-2 0 1 1 0 012 0zm-.25-6.25a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z"/></svg>
+                        Get this from your GitHub OAuth App settings
+                    </div>
+                </div>
+
+                <!-- Redirect URI Section -->
+                <div class="redirect-section">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"/></svg>
+                        Your Redirect URI (copy this!)
+                    </h3>
+                    <div class="redirect-uri-box" id="redirectUriBox" onclick="copyRedirectUri()">
+                        <span id="redirectUri">https://zurai02.github.io/Blog/callback.html</span>
+                        <button class="copy-btn" id="copyBtn">
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/></svg>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sign In Button -->
+                <button class="signin-btn" id="signinBtn" onclick="signInWithGitHub()">
+                    <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    Sign in with GitHub
+                </button>
+            </div>
+
+            <!-- User Profile (shown after auth) -->
+            <div class="profile-card" id="profileCard">
+                <img class="profile-avatar" id="profileAvatar" src="" alt="Avatar">
+                <div class="profile-name" id="profileName"></div>
+                <div class="profile-login" id="profileLogin"></div>
+                <div class="profile-stats">
+                    <div class="stat">
+                        <div class="stat-value" id="statRepos">0</div>
+                        <div class="stat-label">Repos</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="statFollowers">0</div>
+                        <div class="stat-label">Followers</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="statFollowing">0</div>
+                        <div class="stat-label">Following</div>
+                    </div>
+                </div>
+                <button class="signout-btn" onclick="signOut()">Sign Out</button>
+            </div>
+
+            <!-- Steps Guide -->
+            <div class="steps-guide">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"/><path d="M7.5 7.5V4.75a.75.75 0 011.5 0v3.5a.75.75 0 01-.75.75h-3.5a.75.75 0 010-1.5H7.5z"/></svg>
+                    Setup Steps
+                </h3>
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        Go to <a href="https://github.com/settings/developers" target="_blank">GitHub Developer Settings</a> → OAuth Apps → New OAuth App
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        Set <strong>Authorization callback URL</strong> to the Redirect URI above
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        Copy the <code>Client ID</code> and paste it above
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        Click "Sign in with GitHub" to authenticate
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal Output -->
+            <div class="terminal" id="terminal">
+                <div class="terminal-header">
+                    <div class="terminal-dot red"></div>
+                    <div class="terminal-dot yellow"></div>
+                    <div class="terminal-dot green"></div>
+                </div>
+                <div id="terminalContent">
+                    <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">github-oauth --init</span></div>
+                    <div class="terminal-line"><span class="output">GitHub OAuth 2.0 widget initialized</span></div>
+                    <div class="terminal-line"><span class="output">Waiting for Client ID...</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm3.78-9.72a.751.751 0 00-.018-1.06.751.751 0 00-1.06-.018L6.75 9.19 5.28 7.72a.751.751 0 00-1.042.018.751.751 0 00-.018 1.042l2 2a.75.75 0 001.06 0l4.5-4.5z"/></svg>
+        <span id="toastMessage">Copied to clipboard!</span>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            redirectUri: 'https://zurai02.github.io/Blog/callback.html',
+            scope: 'read:user user:email',
+            githubAuthUrl: 'https://github.com/login/oauth/authorize'
+        };
+
+        // Generate particles
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // Terminal logging
+        function log(message, type = 'output') {
+            const terminal = document.getElementById('terminalContent');
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = message;
+            line.appendChild(span);
+
+            terminal.appendChild(line);
+            terminal.parentElement.scrollTop = terminal.parentElement.scrollHeight;
+        }
+
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.textContent = message;
+            toast.className = 'toast show ' + type;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Copy redirect URI
+        function copyRedirectUri() {
+            const uri = document.getElementById('redirectUri').textContent;
+            navigator.clipboard.writeText(uri).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.classList.add('copied');
+                btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg> Copied!`;
+                showToast('Redirect URI copied to clipboard!');
+                log('Redirect URI copied to clipboard', 'success');
+
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/></svg> Copy`;
+                }, 2000);
+            });
+        }
+
+        // Generate random state
+        function generateState() {
+            const array = new Uint8Array(16);
+            crypto.getRandomValues(array);
+            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        // Sign in with GitHub
+        function signInWithGitHub() {
+            const clientId = document.getElementById('clientId').value.trim();
+
+            if (!clientId) {
+                showToast('Please enter your GitHub Client ID', 'error');
+                log('Error: Client ID is required', 'error');
+                document.getElementById('clientId').focus();
+                return;
+            }
+
+            const state = generateState();
+            localStorage.setItem('github_oauth_state', state);
+            localStorage.setItem('github_client_id', clientId);
+
+            const params = new URLSearchParams({
+                client_id: clientId,
+                redirect_uri: CONFIG.redirectUri,
+                scope: CONFIG.scope,
+                state: state,
+                allow_signup: 'true'
+            });
+
+            log('Initiating GitHub OAuth flow...', 'cmd');
+            log(`Client ID: ${clientId.substring(0, 8)}...`, 'output');
+            log(`State: ${state.substring(0, 16)}...`, 'output');
+            log('Redirecting to GitHub...', 'success');
+
+            // Redirect to GitHub
+            window.location.href = `${CONFIG.githubAuthUrl}?${params.toString()}`;
+        }
+
+        // Check for OAuth callback
+        function checkOAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            const error = urlParams.get('error');
+
+            if (error) {
+                log(`OAuth Error: ${error}`, 'error');
+                showToast(`Authentication failed: ${error}`, 'error');
+                return;
+            }
+
+            if (code && state) {
+                const savedState = localStorage.getItem('github_oauth_state');
+
+                if (state !== savedState) {
+                    log('Error: State mismatch - possible CSRF attack', 'error');
+                    showToast('Security error: State mismatch', 'error');
+                    return;
+                }
+
+                log('Authorization code received!', 'success');
+                log(`Code: ${code.substring(0, 20)}...`, 'output');
+                log('Note: Code exchange requires a backend server', 'output');
+                log('Displaying mock user data for demo...', 'output');
+
+                // For demo purposes, show mock authenticated state
+                // In production, send code to your backend to exchange for token
+                showMockUserProfile();
+            }
+        }
+
+        // Show mock user profile (for demo without backend)
+        function showMockUserProfile() {
+            document.getElementById('authForm').style.display = 'none';
+            document.getElementById('authHeader').style.display = 'none';
+
+            const profileCard = document.getElementById('profileCard');
+            profileCard.classList.add('active');
+
+            // Mock data
+            document.getElementById('profileAvatar').src = 'https://avatars.githubusercontent.com/u/9919?v=4';
+            document.getElementById('profileName').textContent = 'GitHub User';
+            document.getElementById('profileLogin').textContent = '@github-user';
+            document.getElementById('statRepos').textContent = '42';
+            document.getElementById('statFollowers').textContent = '128';
+            document.getElementById('statFollowing').textContent = '64';
+
+            // Update status
+            const badge = document.getElementById('statusBadge');
+            badge.classList.remove('pending');
+            badge.classList.add('authenticated');
+            document.getElementById('statusText').textContent = 'Authenticated';
+
+            log('User authenticated successfully!', 'success');
+            showToast('Successfully signed in with GitHub!');
+        }
+
+        // Sign out
+        function signOut() {
+            localStorage.removeItem('github_oauth_state');
+            localStorage.removeItem('github_client_id');
+
+            document.getElementById('authForm').style.display = 'block';
+            document.getElementById('authHeader').style.display = 'block';
+            document.getElementById('profileCard').classList.remove('active');
+            document.getElementById('clientId').value = '';
+
+            const badge = document.getElementById('statusBadge');
+            badge.classList.remove('authenticated');
+            badge.classList.add('pending');
+            document.getElementById('statusText').textContent = 'Not Authenticated';
+
+            log('User signed out', 'output');
+            showToast('Signed out successfully');
+        }
+
+        // Load saved client ID
+        function loadSavedData() {
+            const savedClientId = localStorage.getItem('github_client_id');
+            if (savedClientId) {
+                document.getElementById('clientId').value = savedClientId;
+                log('Loaded saved Client ID', 'output');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            createParticles();
+            loadSavedData();
+            checkOAuthCallback();
+
+            // Update redirect URI based on current URL
+            const currentOrigin = window.location.origin;
+            const currentPath = window.location.pathname.replace(/\/[^\/]*$/, '');
+            const redirectUri = `${currentOrigin}${currentPath}/callback.html`;
+            document.getElementById('redirectUri').textContent = redirectUri;
+
+            log(`Redirect URI set to: ${redirectUri}`, 'output');
+        });
+
+        // Enter key to submit
+        document.getElementById('clientId')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') signInWithGitHub();
+        });
+    </script>
+</body>
+  </html>
