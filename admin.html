@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>zurai02 — admin</title>
+  <meta name="description" content="Admin panel for zurai02 blog.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -12,11 +14,16 @@
   <canvas id="particle-canvas"></canvas>
 
   <nav class="nav">
-    <a href="/" class="nav-brand">zurai02</a>
-    <div class="nav-links">
-      <a href="/">blog</a>
-      <a href="https://zurai02.github.io" target="_blank">portfolio</a>
+    <a href="/Blog" class="nav-brand">zurai02</a>
+    <div class="nav-links" id="nav-links">
+      <a href="/Blog">blog</a>
+      <a href="https://zurai02.is-a.dev" target="_blank">portfolio</a>
+      <a href="https://github.com/zurai02/Luazi" target="_blank">Luazi</a>
+      <a href="https://github.com/zurai02" target="_blank">GitHub</a>
     </div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
   </nav>
 
   <main class="container">
@@ -62,6 +69,15 @@
     </div>
   </main>
 
+  <footer class="footer">
+    <span>zurai02 — built with raw HTML, CSS, and JS</span>
+    <span class="footer-right">
+      <a href="https://github.com/zurai02" target="_blank">GitHub</a>
+      <a href="https://devforum.roblox.com/u/zurai02" target="_blank">DevForum</a>
+      <a href="https://zurai02.is-a.dev" target="_blank">Portfolio</a>
+    </span>
+  </footer>
+
   <script src="site.js"></script>
   <script>
     (function(){
@@ -73,4 +89,4 @@
     })();
   </script>
 </body>
-              </html>
+</html>
