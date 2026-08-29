@@ -1,5 +1,5 @@
 /* ============================================
-   zurai02 blog — site.js (FIXED VERSION)
+   zurai02 blog — site.js (UPGRADED)
    Particles, typewriter, posts, admin, markdown
    ============================================ */
 
@@ -10,7 +10,8 @@ const CONFIG = {
     'building compilers.',
     'optimizing frames.',
     'writing Luazi.',
-    'breaking limits.'
+    'breaking limits.',
+    'shipping code.'
   ],
   greetingMessages: {
     morning: 'good morning,',
@@ -167,6 +168,70 @@ async function loadPosts() {
   }
 }
 
+// ─── SEARCH & FILTER ─────────────────────────
+let currentFilter = '';
+let currentSort = 'date-desc';
+let currentTag = '';
+
+function setupSearch() {
+  const input = document.getElementById('search-input');
+  const sortSelect = document.getElementById('sort-select');
+  if (!input) return;
+
+  input.addEventListener('input', (e) => {
+    currentFilter = e.target.value.toLowerCase().trim();
+    renderPosts();
+  });
+
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      renderPosts();
+    });
+  }
+}
+
+function filterPosts(posts) {
+  let filtered = posts;
+
+  if (currentFilter) {
+    filtered = filtered.filter(p =>
+      p.title.toLowerCase().includes(currentFilter) ||
+      p.content.toLowerCase().includes(currentFilter) ||
+      p.tags.some(t => t.toLowerCase().includes(currentFilter))
+    );
+  }
+
+  if (currentTag) {
+    filtered = filtered.filter(p => p.tags.includes(currentTag));
+  }
+
+  return filtered;
+}
+
+function sortPosts(posts) {
+  const sorted = [...posts];
+  switch (currentSort) {
+    case 'date-asc':
+      sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+      break;
+    case 'title-asc':
+      sorted.sort((a, b) => a.title.localeCompare(b.title));
+      break;
+    default:
+      sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+  return sorted;
+}
+
+// ─── READ TIME ─────────────────────────────────
+function getReadTime(content) {
+  const words = content.trim().split(/\s+/).length;
+  const minutes = Math.ceil(words / 200);
+  return `${minutes} min read`;
+}
+
+// ─── POST CARD ─────────────────────────────────
 function renderPostCard(post) {
   const excerpt = post.content
     .replace(/```[\s\S]*?```/g, '[code]')
@@ -187,18 +252,51 @@ function renderPostCard(post) {
   `;
 }
 
+// ─── TAG CLOUD ───────────────────────────────
+function renderTagCloud(posts) {
+  const cloud = document.getElementById('tag-cloud');
+  if (!cloud) return;
+
+  const tagCounts = {};
+  posts.forEach(p => {
+    p.tags.forEach(t => {
+      tagCounts[t] = (tagCounts[t] || 0) + 1;
+    });
+  });
+
+  const tags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+
+  cloud.innerHTML = tags.map(([tag, count]) => {
+    const active = tag === currentTag ? 'active' : '';
+    return `<span class="tag ${active}" data-tag="${tag}" onclick="filterByTag('${tag}')">${tag} (${count})</span>`;
+  }).join('');
+}
+
+function filterByTag(tag) {
+  currentTag = currentTag === tag ? '' : tag;
+  renderPosts();
+}
+
+// ─── RENDER POSTS ────────────────────────────
 async function renderPosts() {
-  const posts = await loadPosts();
+  let posts = await loadPosts();
+  posts = filterPosts(posts);
+  posts = sortPosts(posts);
+
   const grid = document.getElementById('posts-grid');
   const count = document.getElementById('post-count');
+  const noResults = document.getElementById('no-results');
   if (!grid) return;
 
   if (count) count.textContent = `${posts.length} total`;
 
   if (posts.length === 0) {
-    grid.innerHTML = '<p class="no-posts">No posts yet.</p>';
+    grid.innerHTML = '';
+    if (noResults) noResults.style.display = 'block';
     return;
   }
+
+  if (noResults) noResults.style.display = 'none';
 
   grid.innerHTML = posts.map(renderPostCard).join('');
 
@@ -212,29 +310,101 @@ async function renderPosts() {
   }, { threshold: 0.1 });
 
   document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Update tag cloud
+  const allPosts = await loadPosts();
+  renderTagCloud(allPosts);
 }
 
 // ─── SINGLE POST ─────────────────────────────
 async function loadPost(postId) {
-  if (!postId) { location.href = '/'; return; }
-  
+  if (!postId) { location.href = '/Blog'; return; }
+
   const posts = await loadPosts();
   const post = posts.find(p => p.id === postId);
-  if (!post) { 
+  if (!post) {
     console.error('Post not found:', postId);
-    location.href = '/'; 
-    return; 
+    location.href = '/Blog';
+    return;
   }
 
   document.getElementById('page-title').textContent = `zurai02 — ${post.title}`;
   document.getElementById('post-title').textContent = post.title;
   document.getElementById('post-date').textContent = post.date;
+
+  const readTime = getReadTime(post.content);
+  const readEl = document.getElementById('post-readtime');
+  if (readEl) readEl.textContent = readTime;
+
   document.getElementById('post-tags').innerHTML = post.tags
     .map(t => `<span class="tag">${t}</span>`).join('');
   document.getElementById('post-content').innerHTML = markdownToHtml(post.content);
+
+  // Add copy buttons to code blocks
+  document.querySelectorAll('.post-content pre').forEach(pre => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'code-block-wrapper';
+    pre.parentNode.insertBefore(wrapper, pre);
+    wrapper.appendChild(pre);
+
+    const btn = document.createElement('button');
+    btn.className = 'code-copy-btn';
+    btn.textContent = 'Copy';
+    btn.onclick = () => {
+      navigator.clipboard.writeText(pre.textContent);
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    };
+    wrapper.appendChild(btn);
+  });
+
+  // Prev / Next navigation
+  const idx = posts.findIndex(p => p.id === postId);
+  const prevEl = document.getElementById('prev-post');
+  const nextEl = document.getElementById('next-post');
+
+  if (prevEl && idx < posts.length - 1) {
+    const prev = posts[idx + 1];
+    prevEl.innerHTML = `<span>← Previous</span><strong>${escapeHtml(prev.title)}</strong>`;
+    prevEl.href = `post.html?id=${prev.id}`;
+  } else if (prevEl) {
+    prevEl.style.display = 'none';
+  }
+
+  if (nextEl && idx > 0) {
+    const next = posts[idx - 1];
+    nextEl.innerHTML = `<span>Next →</span><strong>${escapeHtml(next.title)}</strong>`;
+    nextEl.href = `post.html?id=${next.id}`;
+  } else if (nextEl) {
+    nextEl.style.display = 'none';
+  }
+
+  // Share links
+  const shareUrl = encodeURIComponent(location.href);
+  const shareText = encodeURIComponent(`${post.title} — zurai02`);
+
+  const shareX = document.getElementById('share-x');
+  if (shareX) shareX.href = `https://twitter.com/intent/tweet?url=${shareUrl}&text=${shareText}`;
+
+  const shareReddit = document.getElementById('share-reddit');
+  if (shareReddit) shareReddit.href = `https://reddit.com/submit?url=${shareUrl}&title=${shareText}`;
+
+  const shareCopy = document.getElementById('share-copy');
+  if (shareCopy) {
+    shareCopy.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigator.clipboard.writeText(location.href);
+      shareCopy.textContent = 'Copied!';
+      setTimeout(() => shareCopy.textContent = 'Copy Link', 2000);
+    });
+  }
 }
 
-// ─── MARKDOWN PARSER (FIXED) ─────────────────
+// ─── MARKDOWN PARSER ─────────────────────────
 function markdownToHtml(md) {
   // Escape HTML first
   let html = md
@@ -244,31 +414,34 @@ function markdownToHtml(md) {
 
   // Code blocks (must be before inline code)
   html = html.replace(/```(lz|luau)?\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-  
+
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  
+
   // Headers
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  
+
   // Bold and italic
   html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  
+
   // Blockquote
   html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-  
+
   // Links [text](url)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // Horizontal rule
+  html = html.replace(/^---$/gm, '<hr>');
 
   // Process paragraphs and lists line by line
   const lines = html.split('\n');
   let result = [];
   let inList = false;
-  let listType = null; // 'ul' or 'ol'
+  let listType = null;
   let listBuffer = [];
 
   function flushList() {
@@ -288,7 +461,7 @@ function markdownToHtml(md) {
     }
 
     // Skip if it's a block-level element already
-    if (line.startsWith('<h') || line.startsWith('<pre') || line.startsWith('<blockquote')) {
+    if (line.startsWith('<h') || line.startsWith('<pre') || line.startsWith('<blockquote') || line === '<hr>') {
       flushList();
       result.push(line);
       continue;
@@ -296,7 +469,7 @@ function markdownToHtml(md) {
 
     // Unordered list
     const ulMatch = line.match(/^- (.+)$/);
-    // Ordered list  
+    // Ordered list
     const olMatch = line.match(/^\d+\. (.+)$/);
 
     if (ulMatch) {
@@ -319,7 +492,7 @@ function markdownToHtml(md) {
       result.push(`<p>${line}</p>`);
     }
   }
-  
+
   flushList();
   return result.join('\n');
 }
@@ -330,8 +503,7 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ─── ADMIN AUTH (FIXED) ──────────────────────
-// Load credentials from config.json instead of fake .env
+// ─── ADMIN AUTH ──────────────────────────────
 async function loadAdminConfig() {
   try {
     const res = await fetch('admin-config.json');
@@ -341,7 +513,6 @@ async function loadAdminConfig() {
     }
   } catch (e) {
     console.log('No admin-config.json found, using defaults');
-    // Fallback - change these!
     adminCreds = {
       email: 'admin@zurai02.dev',
       password: 'changeme123'
@@ -350,9 +521,8 @@ async function loadAdminConfig() {
 }
 
 async function attemptLogin() {
-  // Ensure config is loaded
   if (!adminCreds.email) await loadAdminConfig();
-  
+
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   const errorEl = document.getElementById('login-error');
@@ -403,7 +573,7 @@ function showEditor(id = null) {
 
   if (id) {
     label.textContent = 'edit post';
-    idField.style.display = 'none'; // Hide ID when editing (can't change it)
+    idField.style.display = 'none';
     const post = postsData.find(p => p.id === id);
     if (post) {
       idField.value = post.id;
@@ -414,7 +584,7 @@ function showEditor(id = null) {
     }
   } else {
     label.textContent = 'new post';
-    idField.style.display = 'block'; // Show ID field for new posts
+    idField.style.display = 'block';
     idField.value = '';
     document.getElementById('edit-title').value = '';
     document.getElementById('edit-date').value = new Date().toISOString().split('T')[0];
@@ -448,7 +618,6 @@ function savePost() {
     return;
   }
 
-  // Check for duplicate ID when creating new post
   if (!editingId && postsData.some(p => p.id === id)) {
     alert(`A post with ID "${id}" already exists. Use a different ID.`);
     return;
@@ -463,10 +632,8 @@ function savePost() {
     postsData.push(newPost);
   }
 
-  // Sort by date
   postsData.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Download updated JSON
   const blob = new Blob([JSON.stringify(postsData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -499,6 +666,17 @@ function deletePost(id) {
   renderAdminPosts();
 }
 
+// ─── MOBILE NAV TOGGLE ─────────────────────────
+function setupMobileNav() {
+  const toggle = document.getElementById('nav-toggle');
+  const links = document.getElementById('nav-links');
+  if (!toggle || !links) return;
+
+  toggle.addEventListener('click', () => {
+    links.classList.toggle('open');
+  });
+}
+
 // ─── INIT ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   // Particles
@@ -511,6 +689,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Typewriter
   const tw = document.getElementById('typewriter');
   if (tw) new Typewriter(tw, CONFIG.typewriterPhrases);
+
+  // Search & filters
+  setupSearch();
+
+  // Mobile nav
+  setupMobileNav();
 
   // Render posts on index
   if (document.getElementById('posts-grid')) {
@@ -526,8 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAdminPosts();
       }
     });
-    
-    // Admin enter key
+
     const loginPw = document.getElementById('login-password');
     if (loginPw) {
       loginPw.addEventListener('keypress', (e) => {
