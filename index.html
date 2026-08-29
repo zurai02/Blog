@@ -237,6 +237,28 @@
     .toast.success { border-color: rgba(74,222,128,0.4); color: #4ade80; }
     .toast.error { border-color: rgba(248,81,73,0.4); color: #f85149; }
 
+    /* Error banner */
+    .oauth-error-banner {
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.4rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      color: #f85149;
+      display: none;
+    }
+    .oauth-error-banner.active {
+      display: block;
+    }
+    .oauth-error-banner code {
+      background: rgba(255,255,255,0.05);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
     @media (max-width: 640px) {
       .auth-bar { padding: 0.5rem 1.2rem; }
       .auth-bar .user-chip .user-name { display: none; }
@@ -270,6 +292,12 @@
   </nav>
 
   <main class="container" style="padding-top: 8.5rem;">
+    <!-- OAuth Error Banner -->
+    <div class="oauth-error-banner" id="oauth-error-banner">
+      <strong>OAuth Error:</strong> <span id="oauth-error-msg"></span><br>
+      <small>Make sure your GitHub OAuth App's callback URL is set to: <code id="oauth-redirect-uri"></code></small>
+    </div>
+
     <header class="hero">
       <div class="hero-greeting" id="greeting"></div>
       <h1 class="hero-title">
@@ -344,9 +372,10 @@
     // GITHUB OAUTH 2.0 — PUBLIC SIGN-IN & POSTING
     // ═══════════════════════════════════════════════════════
 
+    // IMPORTANT: This MUST match exactly what's in your GitHub OAuth App settings
     const GITHUB_CONFIG = {
       clientId: 'Ov23limdCh9gLE61RQ8a',
-      redirectUri: 'https://zurai02.github.io/Blog/',
+      redirectUri: 'https://zurai02.github.io/Blog/callback.html',
       scope: 'read:user user:email',
       authUrl: 'https://github.com/login/oauth/authorize'
     };
@@ -444,9 +473,17 @@
       const code = urlParams.get('code');
       const state = urlParams.get('state');
       const error = urlParams.get('error');
+      const errorDesc = urlParams.get('error_description');
+
+      // Show the expected redirect URI for debugging
+      document.getElementById('oauth-redirect-uri').textContent = GITHUB_CONFIG.redirectUri;
 
       if (error) {
-        showToast('Auth failed: ' + error, 'error');
+        const banner = document.getElementById('oauth-error-banner');
+        const msg = document.getElementById('oauth-error-msg');
+        msg.textContent = errorDesc || error;
+        banner.classList.add('active');
+        showToast('Auth failed: ' + (errorDesc || error), 'error');
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
@@ -465,18 +502,9 @@
       window.history.replaceState({}, document.title, window.location.pathname);
 
       // ─── EXCHANGE CODE FOR TOKEN ─────────────────────
-      // We use a CORS proxy to call GitHub's token endpoint
-      // In production, you should use your own backend
       showToast('Exchanging code for token...');
 
       try {
-        // Try multiple CORS proxies
-        const proxyUrls = [
-          'https://corsproxy.io/?',
-          'https://api.allorigins.win/raw?url=',
-          'https://api.codetabs.com/v1/proxy?quest='
-        ];
-
         const tokenUrl = 'https://github.com/login/oauth/access_token';
         const body = new URLSearchParams({
           client_id: GITHUB_CONFIG.clientId,
@@ -486,43 +514,31 @@
           state: state
         });
 
-        let tokenData = null;
-        let lastErr = null;
+        // Use a CORS proxy
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(tokenUrl);
 
-        for (const proxy of proxyUrls) {
-          try {
-            const res = await fetch(proxy + encodeURIComponent(tokenUrl), {
-              method: 'POST',
-              headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: body.toString()
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.access_token) {
-                tokenData = data;
-                break;
-              }
-            }
-          } catch (e) { lastErr = e; }
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: { 
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: body.toString()
+        });
+
+        const tokenData = await res.json();
+
+        if (tokenData.error) {
+          const banner = document.getElementById('oauth-error-banner');
+          const msg = document.getElementById('oauth-error-msg');
+          msg.textContent = tokenData.error_description || tokenData.error;
+          banner.classList.add('active');
+          showToast('Token exchange failed: ' + (tokenData.error_description || tokenData.error), 'error');
+          return;
         }
 
-        // Fallback: try direct fetch (may work on some browsers/configs)
-        if (!tokenData) {
-          try {
-            const res = await fetch(tokenUrl, {
-              method: 'POST',
-              headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: body.toString()
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.access_token) tokenData = data;
-            }
-          } catch (e) { /* ignore */ }
-        }
-
-        if (!tokenData || !tokenData.access_token) {
-          showToast('Could not exchange code. Try signing in again.', 'error');
+        if (!tokenData.access_token) {
+          showToast('Could not get access token', 'error');
           return;
         }
 
@@ -665,7 +681,6 @@
           if (putRes.ok) {
             showToast('Post published to GitHub!');
             closePublicEditor();
-            // Reload posts
             setTimeout(() => renderPosts(), 500);
             return;
           }
@@ -725,4 +740,4 @@
     });
   </script>
 </body>
-        </html>
+</html>
