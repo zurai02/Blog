@@ -1,6 +1,6 @@
 /* ============================================
-   zurai02 blog — site.js (UPGRADED)
-   Particles, typewriter, posts, admin, markdown
+   zurai02 blog — site.js (UPGRADED + GITHUB AUTH)
+   Particles, typewriter, posts, admin, markdown, GitHub OAuth
    ============================================ */
 
 // ─── CONFIG ─────────────────────────────────
@@ -25,6 +25,26 @@ const CONFIG = {
     path: 'posts.json'
   }
 };
+
+// ─── GITHUB AUTH HELPERS (shared) ────────────
+function getGitHubUser() {
+  try { return JSON.parse(localStorage.getItem('github_user') || 'null'); }
+  catch { return null; }
+}
+
+function setGitHubUser(user) {
+  if (user) localStorage.setItem('github_user', JSON.stringify(user));
+  else localStorage.removeItem('github_user');
+}
+
+function getGitHubToken() {
+  return localStorage.getItem('github_access_token') || '';
+}
+
+function setGitHubToken(token) {
+  if (token) localStorage.setItem('github_access_token', token);
+  else localStorage.removeItem('github_access_token');
+}
 
 // ─── PARTICLE SYSTEM ─────────────────────────
 class ParticleSystem {
@@ -208,7 +228,8 @@ function filterPosts(posts) {
     filtered = filtered.filter(p =>
       p.title.toLowerCase().includes(currentFilter) ||
       p.content.toLowerCase().includes(currentFilter) ||
-      p.tags.some(t => t.toLowerCase().includes(currentFilter))
+      p.tags.some(t => t.toLowerCase().includes(currentFilter)) ||
+      (p.author && p.author.toLowerCase().includes(currentFilter))
     );
   }
 
@@ -250,8 +271,16 @@ function renderPostCard(post) {
 
   const tagsHtml = post.tags.map(t => `<span class="tag">${t}</span>`).join('');
 
+  const authorHtml = post.author
+    ? `<div class="post-card-author">
+         <img src="${post.author_avatar || 'https://github.com/ghost.png'}" alt="" onerror="this.src='https://github.com/ghost.png'">
+         <span>@${post.author}</span>
+       </div>`
+    : '';
+
   return `
     <a href="post.html?id=${post.id}" class="post-card reveal">
+      ${authorHtml}
       <div class="post-card-header">
         <span class="post-card-title">${escapeHtml(post.title)}</span>
         <span class="post-card-date">${post.date}</span>
@@ -348,6 +377,20 @@ async function loadPost(postId) {
   const readTime = getReadTime(post.content);
   const readEl = document.getElementById('post-readtime');
   if (readEl) readEl.textContent = readTime;
+
+  // Author info
+  const authorEl = document.getElementById('post-author');
+  if (authorEl) {
+    if (post.author) {
+      authorEl.innerHTML = `
+        <img src="${post.author_avatar || 'https://github.com/ghost.png'}" alt="" style="width:18px;height:18px;border-radius:50%;border:1px solid var(--border);margin-right:4px;" onerror="this.src='https://github.com/ghost.png'">
+        <span>@${post.author}</span>
+      `;
+      authorEl.style.display = 'inline-flex';
+    } else {
+      authorEl.style.display = 'none';
+    }
+  }
 
   document.getElementById('post-tags').innerHTML = post.tags
     .map(t => `<span class="tag">${t}</span>`).join('');
@@ -525,11 +568,11 @@ function escapeHtml(text) {
 // entered by the admin. The token lives only in sessionStorage (this tab,
 // this session) — it is never written into any file this app ships.
 
-function getGithubToken() {
+function getAdminGithubToken() {
   return sessionStorage.getItem('zurai_gh_token') || '';
 }
 
-function setGithubToken(token) {
+function setAdminGithubToken(token) {
   if (token) sessionStorage.setItem('zurai_gh_token', token);
   else sessionStorage.removeItem('zurai_gh_token');
 }
@@ -539,13 +582,13 @@ function connectGithub() {
   if (!input) return;
   const token = input.value.trim();
   if (!token) return;
-  setGithubToken(token);
+  setAdminGithubToken(token);
   input.value = '';
   updateGithubStatusDisplay('token saved for this session ✓');
 }
 
 function disconnectGithub() {
-  setGithubToken('');
+  setAdminGithubToken('');
   updateGithubStatusDisplay('disconnected');
 }
 
@@ -556,7 +599,7 @@ function updateGithubStatusDisplay(message) {
     statusEl.textContent = message;
     return;
   }
-  statusEl.textContent = getGithubToken()
+  statusEl.textContent = getAdminGithubToken()
     ? 'connected for this session'
     : 'not connected — saving will download posts.json instead';
 }
@@ -567,7 +610,7 @@ function utf8ToBase64(str) {
 }
 
 async function githubApiRequest(method, body) {
-  const token = getGithubToken();
+  const token = getAdminGithubToken();
   const url = `https://api.github.com/repos/${CONFIG.github.owner}/${CONFIG.github.repo}/contents/${CONFIG.github.path}`;
   const opts = {
     method,
@@ -608,7 +651,7 @@ function downloadPostsJson() {
 // Falls back to a local download if no token is set, or if the commit fails.
 async function commitPostsToGithub(commitMessage) {
   const statusEl = document.getElementById('github-status');
-  const token = getGithubToken();
+  const token = getAdminGithubToken();
 
   if (!token) {
     if (statusEl) statusEl.textContent = 'no GitHub token set — downloading posts.json instead.';
@@ -713,6 +756,7 @@ async function renderAdminPosts() {
         <span class="admin-post-title">
           ${escapeHtml(post.title)}
           ${post.draft ? '<span class="draft-badge">draft</span>' : ''}
+          ${post.author ? `<span style="font-size:0.7rem;color:var(--text-dim);margin-left:0.5rem;">by @${post.author}</span>` : ''}
         </span>
         <span class="admin-post-date">${post.date} · ${post.id}</span>
       </div>
