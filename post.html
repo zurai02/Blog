@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title id="page-title">zurai02 — blog</title>
+  <meta name="description" content="Thoughts on Luau, systems programming, and squeezing frames.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -12,23 +14,43 @@
   <canvas id="particle-canvas"></canvas>
 
   <nav class="nav">
-    <a href="/" class="nav-brand">zurai02</a>
-    <div class="nav-links">
-      <a href="/">blog</a>
-      <a href="https://zurai02.github.io" target="_blank">portfolio</a>
+    <a href="/Blog" class="nav-brand">zurai02</a>
+    <div class="nav-links" id="nav-links">
+      <a href="/Blog">blog</a>
+      <a href="https://zurai02.is-a.dev" target="_blank">portfolio</a>
       <a href="https://github.com/zurai02/Luazi" target="_blank">Luazi</a>
+      <a href="https://github.com/zurai02" target="_blank">GitHub</a>
     </div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
   </nav>
 
   <main class="container">
     <article class="post-article" id="post-article">
       <div class="post-meta">
-        <a href="/" class="back-link">← all posts</a>
-        <span class="post-date" id="post-date"></span>
+        <a href="/Blog" class="back-link">← all posts</a>
+        <div class="post-meta-right">
+          <span class="post-date" id="post-date"></span>
+          <span class="post-readtime" id="post-readtime"></span>
+        </div>
       </div>
       <h1 class="post-title" id="post-title"></h1>
       <div class="post-tags" id="post-tags"></div>
       <div class="post-content" id="post-content"></div>
+
+      <div class="post-footer">
+        <div class="post-nav">
+          <a href="/Blog" class="post-nav-link" id="prev-post"></a>
+          <a href="/Blog" class="post-nav-link" id="next-post"></a>
+        </div>
+        <div class="post-share">
+          <span>Share:</span>
+          <a href="#" id="share-x" target="_blank">𝕏</a>
+          <a href="#" id="share-reddit" target="_blank">Reddit</a>
+          <a href="#" id="share-copy">Copy Link</a>
+        </div>
+      </div>
     </article>
   </main>
 
@@ -37,6 +59,7 @@
     <span class="footer-right">
       <a href="https://github.com/zurai02" target="_blank">GitHub</a>
       <a href="https://devforum.roblox.com/u/zurai02" target="_blank">DevForum</a>
+      <a href="https://zurai02.is-a.dev" target="_blank">Portfolio</a>
     </span>
   </footer>
 
@@ -45,7 +68,7 @@
     (function(){
       const params = new URLSearchParams(location.search);
       const postId = params.get('id');
-      if (!postId) { location.href = '/'; return; }
+      if (!postId) { location.href = '/Blog'; return; }
       loadPost(postId);
     })();
   </script>
