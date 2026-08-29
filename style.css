@@ -347,6 +347,19 @@ body {
   white-space: nowrap;
 }
 
+/* Author line on post cards */
+.post-card-author {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-bottom: 0.7rem;
+}
+.post-card-author .author-name {
+  color: var(--text-muted);
+}
+
 .post-card-excerpt {
   font-size: 0.9rem;
   color: var(--text-muted);
@@ -374,6 +387,43 @@ body {
   border-radius: 100px;
   text-transform: lowercase;
   letter-spacing: 0.5px;
+}
+
+/* Verified badge — used on post cards, single-post header, admin list */
+.verified-badge {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+/* Draft badge — admin list + card */
+.draft-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: #ffb85c;
+  background: rgba(255, 184, 92, 0.12);
+  border: 1px solid rgba(255, 184, 92, 0.3);
+  padding: 0.1rem 0.55rem;
+  border-radius: 100px;
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+  margin-left: 0.6rem;
+  vertical-align: middle;
+}
+
+/* Draft preview banner on the single-post page */
+.draft-banner {
+  background: rgba(255, 184, 92, 0.1);
+  border: 1px solid rgba(255, 184, 92, 0.3);
+  color: #ffb85c;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.2px;
 }
 
 /* Tag Cloud */
@@ -431,10 +481,21 @@ body {
   color: var(--accent);
 }
 
+.post-author {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+}
+
 .post-date {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-dim);
+}
+.post-date::before {
+  content: '• ';
 }
 
 .post-readtime {
@@ -756,6 +817,83 @@ body {
   letter-spacing: -0.5px;
 }
 
+/* GitHub sync panel */
+.github-connect {
+  padding: 1.2rem 1.4rem;
+  margin-bottom: 1.5rem;
+}
+.github-connect-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: lowercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.9rem;
+}
+.github-connect-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.github-connect-row input {
+  flex: 1;
+  min-width: 200px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 1rem;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.github-connect-row input:focus {
+  border-color: var(--accent);
+}
+.github-status {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+  margin-top: 0.8rem;
+  min-height: 1rem;
+}
+.github-note {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}
+
+/* Admin filter tabs */
+.admin-filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+.admin-filter-tabs .tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+  transition: all var(--transition);
+}
+.admin-filter-tabs .tab:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+.admin-filter-tabs .tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .admin-posts-list {
   display: flex;
   flex-direction: column;
@@ -793,6 +931,15 @@ body {
   font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--text-dim);
+  display: flex;
+  align-items: center;
+}
+
+.no-posts {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  padding: 2rem 0;
+  text-align: center;
 }
 
 .admin-post-actions {
@@ -859,6 +1006,25 @@ body {
   font-size: 0.8rem;
   line-height: 1.6;
   resize: vertical;
+}
+
+/* Draft / verified checkboxes in the editor */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
 }
 
 .editor-actions {
@@ -1013,8 +1179,12 @@ body {
     align-items: flex-end;
     gap: 0.2rem;
   }
+  .post-date::before,
   .post-readtime::before {
     content: '';
+  }
+  .github-connect-row {
+    flex-direction: column;
   }
 }
 
